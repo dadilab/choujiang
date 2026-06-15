@@ -2,83 +2,99 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>目录HTML文件列表</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HTML 文件目录</title>
     <style>
-        body { font-size: 16px; padding: 2rem; max-width: 800px; margin: 0 auto; }
-        li { margin: 8px 0; }
-        a { text-decoration: none; color: #0066cc; }
-        a:hover { text-decoration: underline; }
+        body {
+            max-width: 900px;
+            margin: 2rem auto;
+            padding: 0 20px;
+            font-family: system-ui, sans-serif;
+        }
+        h2 {
+            color: #222;
+        }
+        ol {
+            line-height: 2;
+            padding-left: 25px;
+        }
+        li {
+            margin: 6px 0;
+        }
+        a {
+            color: #0969da;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
     <h2>当前目录 HTML 文件列表</h2>
-    <ol id="fileList"></ol>
+    <ol id="htmlList"></ol>
 
     <script>
-        // 获取列表容器
-        const listBox = document.getElementById('fileList');
+        const list = document.getElementById('htmlList');
+        // 当前页面文件名
+        const currentFile = location.pathname.split('/').pop();
 
-        // 借助当前页面路径获取当前目录地址
-        const currentPath = location.href.substring(0, location.href.lastIndexOf('/') + 1);
-
-        // 兼容不同服务器环境，列出同目录下html文件（简易版适配静态站点）
-        // 方案：利用服务端目录浏览 + 前端解析，下面提供【通用前端实现】+ 说明
-        // ------------------- 方式一：适用于开启目录浏览的Web服务器（推荐） -------------------
-        async function getHtmlFiles() {
+        // 加载目录并解析文件
+        async function loadHtmlFiles() {
             try {
-                // 请求当前目录列表页
-                const res = await fetch(currentPath);
-                const html = await res.text();
-                const tempDom = document.createElement('div');
-                tempDom.innerHTML = html;
+                // 请求当前目录页面
+                const res = await fetch('./');
+                const dirHtml = await res.text();
+                const dom = document.createElement('div');
+                dom.innerHTML = dirHtml;
 
-                // 筛选所有 .html / .htm 链接
-                const links = tempDom.querySelectorAll('a');
-                const htmlFiles = [];
+                // 筛选所有 html 链接
+                const allLinks = dom.querySelectorAll('a');
+                const fileArr = [];
 
-                links.forEach(a => {
-                    const href = a.getAttribute('href');
-                    // 排除自身页面，只取html文件
-                    if (href && (href.endsWith('.html') || href.endsWith('.htm')) 
-                        && !href.includes(location.pathname.split('/').pop())) {
-                        htmlFiles.push(href);
+                allLinks.forEach(link => {
+                    const href = link.getAttribute('href');
+                    // 过滤：html 文件、非当前页面、非上级目录
+                    if (href 
+                        && href.endsWith('.html') 
+                        && href !== currentFile 
+                        && !href.startsWith('..')) {
+                        fileArr.push(href);
                     }
                 });
 
-                // 逐个读取html文件的title并渲染列表
-                for (const file of htmlFiles) {
-                    try {
-                        const fileRes = await fetch(file);
-                        const fileText = await fileRes.text();
-                        // 正则提取 title 内容
-                        const titleReg = /<title>([\s\S]*?)<\/title>/i;
-                        const match = fileText.match(titleReg);
-                        const fileTitle = match ? match[1].trim() : file;
-
-                        // 构建列表项
-                        const li = document.createElement('li');
-                        const aTag = document.createElement('a');
-                        aTag.href = file;
-                        aTag.target = '_blank'; // 新窗口打开
-                        aTag.textContent = fileTitle;
-                        li.appendChild(aTag);
-                        listBox.appendChild(li);
-                    } catch (err) {
-                        console.log('读取文件失败：', file);
-                    }
+                // 无文件提示
+                if (fileArr.length === 0) {
+                    list.innerHTML = '<li>暂无其他 HTML 文件</li>';
+                    return;
                 }
 
-                if (htmlFiles.length === 0) {
-                    listBox.innerHTML = '<li>当前目录未找到其他HTML文件</li>';
+                // 逐个读取 title 并渲染列表
+                for (const file of fileArr) {
+                    const fileRes = await fetch(file);
+                    const content = await fileRes.text();
+                    // 正则提取 title 内容
+                    const titleReg = /<title>([\s\S]*?)<\/title>/gi;
+                    const match = content.match(titleReg);
+                    let title = match ? match[1].trim() : file;
+
+                    // 构建列表项
+                    const li = document.createElement('li');
+                    const a = document.createElement('a');
+                    a.href = file;
+                    a.target = '_blank'; // 新窗口打开
+                    a.textContent = title;
+                    li.appendChild(a);
+                    list.appendChild(li);
                 }
             } catch (err) {
-                listBox.innerHTML = '<li>读取目录失败，请开启服务器目录浏览功能</li>';
+                list.innerHTML = '<li>加载失败，请检查文件部署</li>';
                 console.error(err);
             }
         }
 
         // 执行
-        getHtmlFiles();
+        loadHtmlFiles();
     </script>
 </body>
 </html>
