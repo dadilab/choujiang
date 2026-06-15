@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>课堂抽签大转盘</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{
+  font-family: 'Microsoft YaHei','PingFang SC',sans-serif;
+  background: linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%);
+  min-height:100vh;color:#fff;overflow-x:hidden;
+}
+/* ===== 标题栏 ===== */
+.header{
+  text-align:center;padding:16px 20px 8px;
+}
+.header h1{
+  font-size:clamp(22px,3vw,36px);
+  background:linear-gradient(90deg,#ffd700,#ff8c00);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  background-clip:text;
+  letter-spacing:4px;
+}
+/* ===== 主体布局 ===== */
+.main{
+  display:flex;gap:24px;padding:0 24px 24px;
+  max-width:1400px;margin:0 auto;align-items:flex-start;
+}
+/* ===== 左：转盘区 ===== */
+.wheel-panel{
+  flex:1;min-width:0;
+  display:flex;flex-direction:column;align-items:center;
+  background:rgba(255,255,255,0.04);border-radius:20px;
+  padding:20px;border:1px solid rgba(255,255,255,0.08);
+  position:relative;
+}
+.wheel-wrap{position:relative;width:100%;max-width:560px}
+canvas{display:block;width:100%;height:auto}
+.pointer{
+  position:absolute;top:-8px;left:50%;transform:translateX(-50%);
+  width:0;height:0;
+  border-left:18px solid transparent;
+  border-right:18px solid transparent;
+  border-top:36px solid #ffd700;
+  filter:drop-shadow(0 0 8px rgba(255,215,0,0.6));
+  z-index:5;
+}
+/* ===== 结果区 ===== */
+.result-bar{
+  margin-top:16px;text-align:center;min-height:80px;
+  display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:10px;
+}
+.result-label{
+  font-size:14px;color:rgba(255,255,255,0.5);
+}
+.result-name{
+  font-size:clamp(28px,4vw,48px);font-weight:900;
+  background:linear-gradient(90deg,#ffd700,#ff6b6b,#ffd700);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  background-clip:text;
+  animation:resultPulse 1s ease-out;
+}
+@keyframes resultPulse{
+  0%{transform:scale(1.4);opacity:0.5}
+  100%{transform:scale(1);opacity:1}
+}
+.result-tip{font-size:13px;color:rgba(255,255,255,0.4)}
+/* ===== 按钮 ===== */
+.btn-row{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin-top:6px}
+.btn{
+  border:none;border-radius:12px;padding:12px 28px;
+  font-size:16px;font-weight:700;cursor:pointer;
+  transition:all 0.2s;letter-spacing:1px;
+}
+.btn:active{transform:translateY(2px)}
+.btn-spin{
+  background:linear-gradient(135deg,#ffd700,#ff8c00);
+  color:#1a1a2e;box-shadow:0 4px 20px rgba(255,140,0,0.4);
+  font-size:20px;padding:14px 48px;
+}
+.btn-spin:hover{box-shadow:0 6px 28px rgba(255,140,0,0.6)}
+.btn-spin:disabled{
+  background:#555;color:#999;box-shadow:none;cursor:not-allowed;
+}
+.btn-remove{
+  background:linear-gradient(135deg,#ff4757,#ff6b81);
+  color:#fff;box-shadow:0 4px 16px rgba(255,71,87,0.3);
+}
+.btn-remove:hover{box-shadow:0 6px 22px rgba(255,71,87,0.5)}
+.btn-remove:disabled{
+  background:#555;color:#999;box-shadow:none;cursor:not-allowed;
+}
+.btn-build{
+  background:linear-gradient(135deg,#2ed573,#7bed9f);
+  color:#1a1a2e;box-shadow:0 4px 16px rgba(46,213,115,0.3);
+  font-size:18px;padding:14px 36px;
+}
+.btn-build:hover{box-shadow:0 6px 22px rgba(46,213,115,0.5)}
+/* ===== 右：控制面板 ===== */
+.ctrl-panel{
+  width:340px;flex-shrink:0;
+  background:rgba(255,255,255,0.04);border-radius:20px;
+  padding:20px;border:1px solid rgba(255,255,255,0.08);
+  display:flex;flex-direction:column;gap:16px;
+}
+.panel-title{
+  font-size:18px;font-weight:700;color:rgba(255,255,255,0.8);
+  display:flex;align-items:center;gap:8px;
+}
+.panel-title::before{content:'';display:inline-block;width:4px;height:18px;
+  background:linear-gradient(180deg,#ffd700,#ff8c00);border-radius:2px}
+/* 模式切换 */
+.mode-toggle{
+  display:flex;background:rgba(255,255,255,0.06);border-radius:10px;
+  overflow:hidden;
+}
+.mode-btn{
+  flex:1;padding:10px;text-align:center;font-size:14px;
+  cursor:pointer;border:none;background:transparent;color:rgba(255,255,255,0.5);
+  transition:all 0.2s;font-weight:600;
+}
+.mode-btn.active{
+  background:rgba(255,215,0,0.15);color:#ffd700;
+}
+/* 表单模式 */
+.form-row{display:flex;gap:8px}
+.form-row input{
+  flex:1;padding:10px 14px;border-radius:10px;border:1px solid rgba(255,255,255,0.15);
+  background:rgba(255,255,255,0.06);color:#fff;font-size:14px;outline:none;
+  transition:border 0.2s;
+}
+.form-row input:focus{border-color:#ffd700}
+.form-row input::placeholder{color:rgba(255,255,255,0.25)}
+.btn-sm{
+  border:none;border-radius:10px;padding:10px 16px;
+  font-size:14px;font-weight:600;cursor:pointer;transition:all 0.2s;
+  white-space:nowrap;
+}
+.btn-sm:active{transform:translateY(1px)}
+.btn-add{background:#ffd700;color:#1a1a2e}
+.btn-add:hover{background:#ffed4a}
+/* 文本框模式 */
+.textarea-wrap{display:none;flex-direction:column;gap:8px}
+.textarea-wrap textarea{
+  width:100%;height:140px;padding:12px;border-radius:10px;
+  border:1px solid rgba(255,255,255,0.15);
+  background:rgba(255,255,255,0.06);color:#fff;
+  font-size:14px;resize:vertical;outline:none;
+  font-family:inherit;line-height:1.8;
+}
+.textarea-wrap textarea:focus{border-color:#ffd700}
+.textarea-wrap textarea::placeholder{color:rgba(255,255,255,0.25)}
+.btn-apply{background:rgba(255,215,0,0.15);color:#ffd700;border:1px solid rgba(255,215,0,0.3)}
+.btn-apply:hover{background:rgba(255,215,0,0.25)}
+/* 选项列表 */
+.opt-list{
+  max-height:200px;overflow-y:auto;
+  display:flex;flex-direction:column;gap:6px;
+}
+.opt-list::-webkit-scrollbar{width:4px}
+.opt-list::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.15);border-radius:2px}
+.opt-item{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:8px 12px;border-radius:8px;
+  background:rgba(255,255,255,0.04);font-size:14px;
+  transition:all 0.3s;
+}
+.opt-item.removed{
+  opacity:0.3;text-decoration:line-through;background:rgba(255,71,87,0.08);
+}
+.opt-del{
+  border:none;background:transparent;color:rgba(255,255,255,0.3);
+  cursor:pointer;font-size:18px;padding:2px 6px;border-radius:4px;
+  transition:all 0.2s;
+}
+.opt-del:hover{color:#ff4757;background:rgba(255,71,87,0.15)}
+/* 速度选择 */
+.speed-group{}
+.speed-label{font-size:13px;color:rgba(255,255,255,0.5);margin-bottom:8px}
+.speed-options{display:flex;gap:8px}
+.speed-btn{
+  flex:1;padding:8px;text-align:center;border-radius:8px;
+  border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.04);
+  color:rgba(255,255,255,0.6);cursor:pointer;font-size:14px;font-weight:600;
+  transition:all 0.2s;
+}
+.speed-btn.active{
+  background:rgba(255,215,0,0.12);border-color:#ffd700;color:#ffd700;
+}
+.speed-btn:hover:not(.active){border-color:rgba(255,255,255,0.3)}
+/* 统计 */
+.stats{
+  text-align:center;font-size:13px;color:rgba(255,255,255,0.35);
+  padding:8px 0;border-top:1px solid rgba(255,255,255,0.06);
+}
+/* ===== 标题弹窗 ===== */
+.overlay{
+  position:fixed;top:0;left:0;width:100%;height:100%;
+  background:rgba(0,0,0,0.7);z-index:100;
+  display:flex;align-items:center;justify-content:center;
+}
+.modal-box{
+  background:#1e2a3a;border-radius:20px;padding:36px 32px;
+  width:420px;max-width:90vw;
+  border:1px solid rgba(255,255,255,0.1);
+  display:flex;flex-direction:column;gap:20px;
+  box-shadow:0 20px 60px rgba(0,0,0,0.5);
+}
+.modal-box h2{
+  text-align:center;font-size:22px;
+  background:linear-gradient(90deg,#ffd700,#ff8c00);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  background-clip:text;
+}
+.modal-box input{
+  padding:14px 18px;border-radius:12px;font-size:16px;
+  border:1px solid rgba(255,255,255,0.15);
+  background:rgba(255,255,255,0.06);color:#fff;outline:none;
+  text-align:center;
+}
+.modal-box input:focus{border-color:#ffd700}
+.btn-confirm{
+  padding:14px;border-radius:12px;border:none;
+  background:linear-gradient(135deg,#ffd700,#ff8c00);
+  color:#1a1a2e;font-size:18px;font-weight:700;cursor:pointer;
+  letter-spacing:2px;transition:all 0.2s;
+}
+.btn-confirm:hover{box-shadow:0 4px 20px rgba(255,140,0,0.4)}
+/* ===== Toast ===== */
+.toast{
+  position:fixed;top:24px;left:50%;transform:translateX(-50%);
+  background:rgba(0,0,0,0.85);color:#ffd700;padding:12px 28px;
+  border-radius:30px;font-size:14px;z-index:200;
+  animation:toastIn 0.3s ease-out;
+  pointer-events:none;
+}
+@keyframes toastIn{
+  0%{opacity:0;transform:translateX(-50%) translateY(-20px)}
+  100%{opacity:1;transform:translateX(-50%) translateY(0)}
+}
+/* ===== 响应式 ===== */
+/* ===== 设置齿轮按钮 ===== */
+.settings-gear{
+  position:absolute;top:16px;right:16px;z-index:10;
+  width:44px;height:44px;border-radius:12px;
+  border:1px solid rgba(255,255,255,0.12);
+  background:rgba(255,255,255,0.06);
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;font-size:22px;
+  transition:all 0.2s;color:rgba(255,255,255,0.6);
+}
+.settings-gear:hover{background:rgba(255,215,0,0.12);border-color:rgba(255,215,0,0.4);color:#ffd700}
+/* ===== 控制面板折叠 ===== */
+.ctrl-panel.hidden{display:none}
+/* ===== 移除模式切换 ===== */
+.remove-mode{
+  margin-top:auto;padding-top:16px;
+  border-top:1px solid rgba(255,255,255,0.06);
+}
+.remove-mode-label{
+  font-size:13px;color:rgba(255,255,255,0.5);margin-bottom:8px;
+}
+.remove-toggle{
+  display:flex;background:rgba(255,255,255,0.06);border-radius:10px;
+  overflow:hidden;
+}
+.remove-toggle-btn{
+  flex:1;padding:9px 0;text-align:center;font-size:13px;
+  cursor:pointer;border:none;background:transparent;
+  color:rgba(255,255,255,0.5);transition:all 0.2s;font-weight:600;
+}
+.remove-toggle-btn.active{
+  background:rgba(255,215,0,0.15);color:#ffd700;
+}
+.remove-toggle-btn:hover:not(.active){color:rgba(255,255,255,0.8)}
+/* ===== 建立转盘按钮在面板底部 ===== */
+.btn-build-wrap{
+  margin-top:16px;
+}
+@media(max-width:900px){
+  .ctrl-panel.hidden{display:none!important}
+}
+</style>
+</head>
+<body>
+
+<!-- 标题弹窗 -->
+<div class="overlay" id="titleOverlay">
+  <div class="modal-box">
+    <h2>设置标题</h2>
+    <input id="titleInput" placeholder="输入标题..." value="课堂抽签大转盘" maxlength="30">
+    <button class="btn-confirm" onclick="confirmTitle()">确认</button>
+  </div>
+</div>
+
+<!-- 头部 -->
+<div class="header">
+  <h1 id="pageTitle">课堂抽签大转盘</h1>
+</div>
+
+<div class="main">
+  <!-- 左：转盘 -->
+  <div class="wheel-panel">
+    <button class="settings-gear" id="gearBtn" onclick="togglePanel()" title="打开设置面板">⚙</button>
+    <div class="wheel-wrap">
+      <div class="pointer"></div>
+      <canvas id="wheelCanvas"></canvas>
+    </div>
+    <div class="result-bar" id="resultBar">
+      <div class="result-label">请先输入选项，点击「建立转盘」</div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-spin" id="btnSpin" onclick="startSpin()" disabled>🎰 开始抽签</button>
+      <button class="btn btn-remove" id="btnRemove" onclick="removeWinner()" disabled>🗑 移除该选项</button>
+    </div>
+  </div>
+
+  <!-- 右：控制面板（默认折叠） -->
+  <div class="ctrl-panel hidden" id="ctrlPanel">
+    <div class="panel-title">选项管理</div>
+
+    <!-- 模式切换 -->
+    <div class="mode-toggle">
+      <button class="mode-btn active" id="modeForm" onclick="switchMode('form')">📋 表单模式</button>
+      <button class="mode-btn" id="modeText" onclick="switchMode('text')">📝 文本框模式</button>
+    </div>
+
+    <!-- 表单模式 -->
+    <div class="form-row" id="formMode">
+      <input id="optInput" placeholder="输入选项名称..." maxlength="20">
+      <button class="btn-sm btn-add" onclick="addOption()">添加</button>
+    </div>
+
+    <!-- 文本框模式 -->
+    <div class="textarea-wrap" id="textMode">
+      <textarea id="textareaInput" placeholder="每行一个选项，例如：&#10;张三&#10;李四&#10;王五&#10;赵六"></textarea>
+      <button class="btn-sm btn-apply" onclick="applyTextarea()">应用文本框内容</button>
+    </div>
+
+    <!-- 选项列表 -->
+    <div class="opt-list" id="optList">
+      <div style="text-align:center;color:rgba(255,255,255,0.2);padding:30px">
+        暂无选项，请添加
+      </div>
+    </div>
+
+    <!-- 速度调节 -->
+    <div class="speed-group">
+      <div class="speed-label">⚡ 转盘速度</div>
+      <div class="speed-options">
+        <button class="speed-btn" id="speedFast" onclick="setSpeed('fast')">快</button>
+        <button class="speed-btn active" id="speedMid" onclick="setSpeed('mid')">中</button>
+        <button class="speed-btn" id="speedSlow" onclick="setSpeed('slow')">慢</button>
+      </div>
+    </div>
+
+    <!-- 移除模式切换 -->
+    <div class="remove-mode">
+      <div class="remove-mode-label">🗑 抽中后移除方式</div>
+      <div class="remove-toggle">
+        <button class="remove-toggle-btn active" id="rmAuto" onclick="setRemoveMode('auto')">自动移除</button>
+        <button class="remove-toggle-btn" id="rmManual" onclick="setRemoveMode('manual')">手动移除</button>
+      </div>
+    </div>
+
+    <!-- 建立转盘按钮（面板底部） -->
+    <div class="btn-build-wrap">
+      <button class="btn btn-build" id="btnBuild" onclick="buildWheel()">🎯 建立转盘</button>
+    </div>
+
+    <!-- 统计 -->
+    <div class="stats" id="stats">尚未建立转盘</div>
+  </div>
+</div>
+
+<script>
+// ==================== 数据 ====================
+const WHEEL_COLORS = [
+  '#FF6B6B','#4ECDC4','#45B7D1','#96CEB4',
+  '#FFEAA7','#DDA0DD','#98D8C8','#F7DC6F',
+  '#BB8FCE','#85C1E9','#F8C471','#82E0AA',
+  '#F1948A','#73C6B6','#D7BDE2','#F9E79F',
+  '#E74C3C','#3498DB','#2ECC71','#F39C12'
+];
+
+let options = [];        // [{name, removed}]
+let sectors = [];        // [{name, color, optIdx}]
+let currentAngle = 0;
+let isSpinning = false;
+let hasBuilt = false;
+let winnerIdx = -1;      // 中奖扇区在 sectors 中的索引
+let speedMode = 'mid';   // 'fast' | 'mid' | 'slow'
+let autoRemove = true;  // true=抽中自动移除, false=手动移除
+let inputMode = 'form';  // 'form' | 'text'
+
+const canvas = document.getElementById('wheelCanvas');
+const ctx = canvas.getContext('2d');
+
+// ==================== 标题弹窗 ====================
+function confirmTitle(){
+  const val = document.getElementById('titleInput').value.trim() || '课堂抽签大转盘';
+  document.getElementById('pageTitle').textContent = val;
+  document.title = val;
+  document.getElementById('titleOverlay').style.display = 'none';
+  document.getElementById('titleInput').value = val;
+}
+// ==================== 面板开关 ====================
+function togglePanel(){
+  const panel = document.getElementById('ctrlPanel');
+  panel.classList.toggle('hidden');
+  const gear = document.getElementById('gearBtn');
+  gear.style.background = panel.classList.contains('hidden')
+    ? 'rgba(255,255,255,0.06)'
+    : 'rgba(255,215,0,0.15)';
+}
+// 回车确认
+document.getElementById('titleInput').addEventListener('keydown',e=>{
+  if(e.key==='Enter') confirmTitle();
+});
+// 初始聚焦
+setTimeout(()=>document.getElementById('titleInput').focus(),100);
+
+// ==================== 模式切换 ====================
+function switchMode(mode){
+  inputMode = mode;
+  document.getElementById('modeForm').classList.toggle('active',mode==='form');
+  document.getElementById('modeText').classList.toggle('active',mode==='text');
+  document.getElementById('formMode').style.display = mode==='form'?'flex':'none';
+  document.getElementById('textMode').style.display = mode==='text'?'flex':'none';
+}
+
+// ==================== 表单模式：添加选项 ====================
+function addOption(){
+  const input = document.getElementById('optInput');
+  const name = input.value.trim();
+  if(!name){showToast('请输入选项名称');return}
+  if(options.some(o=>o.name===name&&!o.removed)){showToast('该选项已存在');return}
+  // 如果之前被移除的同名选项存在，恢复它
+  const existIdx = options.findIndex(o=>o.name===name&&o.removed);
+  if(existIdx>=0){
+    options[existIdx].removed = false;
+  }else{
+    options.push({name,removed:false});
+  }
+  input.value = '';
+  input.focus();
+  hasBuilt = false; // 选项变更后需要重新建立转盘
+  updateBuildBtn();
+  renderOptList();
+}
+
+function deleteOption(idx){
+  if(isSpinning)return;
+  options.splice(idx,1);
+  hasBuilt = false;
+  updateBuildBtn();
+  renderOptList();
+  winnerIdx = -1;
+  document.getElementById('btnRemove').disabled = true;
+  document.getElementById('resultBar').innerHTML = '<div class="result-label">请先建立转盘</div>';
+}
+
+// ==================== 文本框模式：应用 ====================
+function applyTextarea(){
+  const raw = document.getElementById('textareaInput').value.trim();
+  if(!raw){showToast('请输入选项');return}
+  const lines = raw.split(/[\n\r]+/).map(l=>l.trim()).filter(Boolean);
+  if(lines.length===0){showToast('请输入选项');return}
+  // 去重
+  const seen = new Set();
+  const newOpts = [];
+  lines.forEach(name=>{
+    if(!seen.has(name)){
+      seen.add(name);
+      newOpts.push({name,removed:false});
+    }
+  });
+  options = newOpts;
+  hasBuilt = false;
+  updateBuildBtn();
+  renderOptList();
+  winnerIdx = -1;
+  document.getElementById('btnRemove').disabled = true;
+  document.getElementById('resultBar').innerHTML = '<div class="result-label">已读取 ' + newOpts.length + ' 个选项，请建立转盘</div>';
+  showToast('已读取 ' + newOpts.length + ' 个选项');
+}
+
+// ==================== 速度 ====================
+function setSpeed(mode){
+  speedMode = mode;
+  document.querySelectorAll('.speed-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('speed'+mode.charAt(0).toUpperCase()+mode.slice(1))?.classList.add('active');
+}
+function getSpeedConfig(){
+  switch(speedMode){
+    case 'fast': return {spins:[8,12],dur:[3000,4000]};
+    case 'slow': return {spins:[3,5],dur:[7000,9000]};
+    default:     return {spins:[5,8],dur:[5000,6500]};
+  }
+}
+
+// ==================== 移除模式 ====================
+function setRemoveMode(mode){
+  autoRemove = (mode==='auto');
+  document.getElementById('rmAuto').classList.toggle('active',autoRemove);
+  document.getElementById('rmManual').classList.toggle('active',!autoRemove);
+  document.getElementById('btnRemove').style.display = autoRemove?'none':'inline-flex';
+}
+
+// ==================== 建立转盘 ====================
+function buildWheel(){
+  const active = options.filter(o=>!o.removed);
+  if(active.length===0){showToast('请先添加至少一个选项');return}
+
+  sectors = [];
+  active.forEach((o,idx)=>{
+    sectors.push({name:o.name,color:WHEEL_COLORS[idx % WHEEL_COLORS.length],optIdx:options.indexOf(o)});
+  });
+  // 等分扇区，每个选项一个扇区
+  currentAngle = 0;
+  hasBuilt = true;
+  winnerIdx = -1;
+
+  drawWheel();
+  document.getElementById('btnSpin').disabled = false;
+  document.getElementById('btnRemove').disabled = true;
+  document.getElementById('resultBar').innerHTML = '<div class="result-label">点击「开始抽签」旋转转盘</div>';
+  updateBuildBtn();
+  updateStats();
+  showToast('转盘已建立，共 ' + sectors.length + ' 个选项');
+}
+
+// ==================== Canvas 绘制 ====================
+function resizeCanvas(){
+  const wrap = canvas.parentElement;
+  const size = Math.min(wrap.clientWidth, 540);
+  canvas.width = size * 2;
+  canvas.height = size * 2;
+}
+
+function drawWheel(hlIdx=-1){
+  resizeCanvas();
+  const w=canvas.width, h=canvas.height, cx=w/2, cy=h/2;
+  const r=Math.min(cx,cy)-8;
+  ctx.clearRect(0,0,w,h);
+
+  if(sectors.length===0){
+    // 空转盘
+    ctx.beginPath();ctx.arc(cx,cy,r-2,0,Math.PI*2);
+    ctx.fillStyle='rgba(255,255,255,0.04)';ctx.fill();
+    ctx.strokeStyle='rgba(255,255,255,0.15)';ctx.lineWidth=3;ctx.stroke();
+    ctx.fillStyle='rgba(255,255,255,0.2)';ctx.font=(r*0.15)+'px "Microsoft YaHei"';
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText('请建立转盘',cx,cy);
+    return;
+  }
+
+  const n = sectors.length;
+  const ap = Math.PI * 2 / n;
+
+  ctx.save();
+  ctx.translate(cx,cy);
+  ctx.rotate(currentAngle);
+
+  // 绘制扇区
+  sectors.forEach((s,i)=>{
+    const startA = i*ap - Math.PI/2;
+    const endA = startA + ap;
+    ctx.beginPath();ctx.moveTo(0,0);
+    ctx.arc(0,0,r-2,startA,endA);
+    ctx.closePath();
+
+    const isHL = (i===hlIdx);
+    ctx.fillStyle = isHL ? '#ffd700' : s.color;
+    if(isHL){
+      ctx.shadowColor = 'rgba(255,215,0,0.8)';
+      ctx.shadowBlur = 20;
+    }else{
+      ctx.shadowColor = 'transparent';
+      ctx.shadowBlur = 0;
+    }
+    ctx.fill();
+
+    // 边框
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // 文字
+    const midA = startA + ap/2;
+    const textR = r * 0.62;
+    ctx.save();
+    ctx.rotate(midA);
+    ctx.fillStyle = '#fff';
+    ctx.font = `bold ${Math.max(30,Math.min(42,r*0.12))}px "Microsoft YaHei"`;
+    ctx.textAlign = 'center';ctx.textBaseline = 'middle';
+    ctx.shadowColor = 'rgba(0,0,0,0.5)';
+    ctx.shadowBlur = 3;
+    const label = s.name.length>6?s.name.slice(0,5)+'…':s.name;
+    ctx.fillText(label,textR,0);
+    ctx.restore();
+  });
+
+  ctx.restore();
+
+  // 外圈装饰
+  ctx.beginPath();ctx.arc(cx,cy,r+1,0,Math.PI*2);
+  ctx.strokeStyle = 'rgba(255,215,0,0.4)';ctx.lineWidth=4;ctx.stroke();
+
+  // 中心圆
+  ctx.beginPath();ctx.arc(cx,cy,r*0.12,0,Math.PI*2);
+  const grad = ctx.createRadialGradient(cx,cy,0,cx,cy,r*0.12);
+  grad.addColorStop(0,'#fff');
+  grad.addColorStop(0.5,'#ffd700');
+  grad.addColorStop(1,'#ff8c00');
+  ctx.fillStyle=grad;ctx.fill();
+  ctx.strokeStyle='rgba(0,0,0,0.3)';ctx.lineWidth=2;ctx.stroke();
+}
+
+// ==================== 缓动 ====================
+function brakeEase(t){
+  return 1 - Math.pow(1 - t, 3);
+}
+
+// ==================== 旋转 ====================
+function startSpin(){
+  if(!hasBuilt||isSpinning||sectors.length===0)return;
+
+  isSpinning = true;
+  winnerIdx = -1;
+  document.getElementById('btnSpin').disabled = true;
+  document.getElementById('btnRemove').disabled = true;
+  document.getElementById('resultBar').innerHTML = '<div class="result-label">🎲 转盘旋转中...</div>';
+  canvas.classList.add('spinning');
+
+  const targetIdx = Math.floor(Math.random()*sectors.length);
+  const ap = Math.PI*2/sectors.length;
+
+  // 目标角度：扇区中心对准指针（顶部 -π/2）
+  // 扇区 i 中心在画布角度 = i*ap + ap/2 - π/2 + currentAngle
+  // 对准指针 (-π/2): i*ap + ap/2 - π/2 + currentAngle ≡ -π/2 => currentAngle ≡ -(i*ap + ap/2)
+  let targetAngle = -(targetIdx * ap + ap / 2);
+  // 规范到 [0, 2π)
+  targetAngle = ((targetAngle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+  // 确保在 currentAngle 前方（顺时针旋转，角度增大）
+  while (targetAngle <= currentAngle + 0.001) targetAngle += Math.PI * 2;
+
+  const cfg = getSpeedConfig();
+  const spins = (cfg.spins[0]+Math.floor(Math.random()*(cfg.spins[1]-cfg.spins[0]+1)))*Math.PI*2;
+  const final = targetAngle + spins;
+  const startA = currentAngle;
+  const delta = final - startA;
+  const dur = cfg.dur[0] + Math.random()*(cfg.dur[1]-cfg.dur[0]);
+  const t0 = performance.now();
+
+  function anim(now){
+    const p = Math.min((now-t0)/dur,1);
+    const e = brakeEase(p);
+    currentAngle = startA + delta*e;
+    const hl = (p>0.80);
+    drawWheel(hl?targetIdx:-1);
+    if(p<1){requestAnimationFrame(anim)}
+    else{
+      currentAngle = ((currentAngle%(Math.PI*2))+Math.PI*2)%(Math.PI*2);
+      const actualIdx = ((targetIdx%sectors.length)+sectors.length)%sectors.length;
+      winnerIdx = actualIdx;
+      const won = sectors[actualIdx];
+      drawWheel(actualIdx);
+      playWinSound();
+      const resultHTML = autoRemove
+        ? `<div class="result-label">🎉 中奖结果</div>
+           <div class="result-name">${won.name}</div>
+           <div class="result-tip">即将自动移除...</div>`
+        : `<div class="result-label">🎉 中奖结果</div>
+           <div class="result-name">${won.name}</div>
+           <div class="result-tip">点击「移除该选项」将其从转盘中删除</div>`;
+      document.getElementById('resultBar').innerHTML = resultHTML;
+
+      isSpinning = false;
+      document.getElementById('btnSpin').disabled = false;
+
+      if(autoRemove){
+        // 自动移除：1秒后自动删除
+        setTimeout(()=>{
+          if(winnerIdx>=0&&winnerIdx<sectors.length) removeWinner();
+        },1000);
+      }else{
+        document.getElementById('btnRemove').disabled = false;
+      }
+    }
+  }
+  requestAnimationFrame(anim);
+}
+
+// ==================== 音效 ====================
+let audioCtx = null;
+function getAudioCtx(){
+  if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+  return audioCtx;
+}
+function playWinSound(){
+  try{
+    const ac = getAudioCtx();
+    const now = ac.currentTime;
+    // 上升三音：C5 → E5 → G5 琶音
+    const notes = [523.25, 659.25, 783.99];
+    notes.forEach((freq,i)=>{
+      const osc = ac.createOscillator();
+      const gain = ac.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0, now+i*0.12);
+      gain.gain.linearRampToValueAtTime(0.35, now+i*0.12+0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, now+i*0.12+0.35);
+      osc.connect(gain);
+      gain.connect(ac.destination);
+      osc.start(now+i*0.12);
+      osc.stop(now+i*0.12+0.4);
+    });
+    // 点缀 bell
+    const bell = ac.createOscillator();
+    const bg = ac.createGain();
+    bell.type = 'triangle';
+    bell.frequency.value = 1046.5;
+    bg.gain.setValueAtTime(0, now+0.3);
+    bg.gain.linearRampToValueAtTime(0.2, now+0.31);
+    bg.gain.exponentialRampToValueAtTime(0.001, now+0.7);
+    bell.connect(bg);
+    bg.connect(ac.destination);
+    bell.start(now+0.3);
+    bell.stop(now+0.75);
+  }catch(e){/* 静默降级 */}
+}
+
+// ==================== 移除中奖选项 ====================
+function removeWinner(){
+  if(isSpinning||winnerIdx<0||winnerIdx>=sectors.length)return;
+  const won = sectors[winnerIdx];
+  const opt = options[won.optIdx];
+  if(!opt||opt.removed)return;
+
+  opt.removed = true;
+  // 重建 sectors（排除 removed 的选项）
+  sectors = [];
+  options.forEach((o,idx)=>{
+    if(!o.removed){
+      sectors.push({name:o.name,color:WHEEL_COLORS[sectors.length % WHEEL_COLORS.length],optIdx:idx});
+    }
+  });
+
+  winnerIdx = -1;
+  currentAngle = 0;
+  drawWheel();
+  renderOptList();
+  updateStats();
+  document.getElementById('btnRemove').disabled = true;
+  document.getElementById('resultBar').innerHTML = '<div class="result-label">「' + won.name + '」已移除，点击「开始抽签」继续</div>';
+
+  if(sectors.length===0){
+    document.getElementById('btnSpin').disabled = true;
+    document.getElementById('resultBar').innerHTML = '<div class="result-label">🎉 所有选项已抽完！</div>';
+  }
+  showToast('「' + won.name + '」已从转盘中移除');
+}
+
+// ==================== 选项列表渲染 ====================
+function renderOptList(){
+  const ct = document.getElementById('optList');
+  if(options.length===0){
+    ct.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,0.2);padding:30px">暂无选项，请添加</div>';
+    updateStats();
+    return;
+  }
+  ct.innerHTML = options.map((o,i)=>{
+    const clr = WHEEL_COLORS[i % WHEEL_COLORS.length];
+    const rmCls = o.removed ? ' removed' : '';
+    return `
+    <div class="opt-item${rmCls}">
+      <span style="display:flex;align-items:center;gap:8px">
+        <span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:${clr};flex-shrink:0;opacity:${o.removed?0.3:1}"></span>
+        ${o.name}${o.removed?' <span style="font-size:11px;color:#ff4757">(已移除)</span>':''}
+      </span>
+      ${o.removed?'':`<button class="opt-del" onclick="deleteOption(${i})" title="删除">✕</button>`}
+    </div>`;
+  }).join('');
+  updateStats();
+}
+
+function updateStats(){
+  const active = options.filter(o=>!o.removed).length;
+  const total = options.length;
+  if(total===0){
+    document.getElementById('stats').textContent = '尚未建立转盘';
+  }else{
+    document.getElementById('stats').textContent = `可用 ${active} / 总计 ${total} 个选项`;
+  }
+}
+
+function updateBuildBtn(){
+  const active = options.filter(o=>!o.removed).length;
+  document.getElementById('btnBuild').disabled = (active===0);
+}
+
+// ==================== Toast ====================
+function showToast(msg){
+  const t = document.createElement('div');
+  t.className='toast';t.textContent=msg;
+  document.body.appendChild(t);
+  setTimeout(()=>{t.style.opacity='0';t.style.transition='opacity 0.3s';
+    setTimeout(()=>t.remove(),300)},2000);
+}
+
+// ==================== 事件 ====================
+document.addEventListener('keydown',e=>{
+  if(e.key===' '||e.key==='Enter'){
+    // 如果弹窗还在，确认标题
+    const ov = document.getElementById('titleOverlay');
+    if(ov.style.display!=='none'){
+      confirmTitle();
+      return;
+    }
+    // 如果编辑弹窗开着，不触发
+    if(document.activeElement?.tagName==='INPUT'||document.activeElement?.tagName==='TEXTAREA')return;
+    e.preventDefault();
+    if(!isSpinning&&hasBuilt&&sectors.length>0) startSpin();
+  }
+});
+
+document.getElementById('optInput').addEventListener('keydown',e=>{
+  if(e.key==='Enter'){e.preventDefault();addOption();}
+});
+
+window.addEventListener('resize',()=>{if(hasBuilt)drawWheel();});
+
+// ==================== 初始化 ====================
+function init(){
+  resizeCanvas();
+  drawWheel();
+  document.getElementById('titleOverlay').style.display = 'flex';
+  setRemoveMode('auto');   // 初始化移除模式：默认自动移除
+}
+init();
+</script>
+</body>
+</html>
